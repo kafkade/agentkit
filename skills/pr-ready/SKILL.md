@@ -3,7 +3,7 @@ name: pr-ready
 description: >
   Prepare a pull request: generate a PR description using the repo's template,
   update the Unreleased section of CHANGELOG.md with user-facing changes, run
-  quality checks, and copy the PR description to the clipboard. Invoke when the
+  quality checks, and write the PR title and description to a local .pr-ready/ file for the pr-submit script to open the PR. Invoke when the
   user asks to "generate a PR description", "describe this PR", "write PR notes",
   "prepare a PR", "pr ready", or "prep this PR".
 ---
@@ -11,7 +11,8 @@ description: >
 # PR Ready — Description + Changelog
 
 Prepare a branch for pull request: generate a PR description from the diff AND
-update the changelog, then copy the PR description to the clipboard.
+update the changelog, then write the PR title and description to a local
+`.pr-ready/` file that the `pr-submit` script can use to open the PR.
 
 ## Steps
 
@@ -137,20 +138,51 @@ update the changelog, then copy the PR description to the clipboard.
 
 ### Phase 5: Output
 
-13. **Copy the PR description to the clipboard**
-    - Detect the OS and use the appropriate command:
-      - **macOS**: `pbcopy`
-      - **Windows (PowerShell)**: `Set-Clipboard`
-      - **Linux**: `xclip -selection clipboard` or `xsel --clipboard --input`
-    - Confirm to the user that the description has been copied
+13. **Write the PR title and description to a `.pr-ready/` file**
+
+    Instead of copying to the clipboard, persist the proposed PR so it can be
+    reviewed and opened later by the `pr-submit` script.
+
+    a. **Ensure the output directory exists and stays untracked**
+       - Create a `.pr-ready/` directory at the repository root.
+       - Keep it out of git *without* touching the tracked `.gitignore` by
+         adding it to the repo-local exclude file:
+         ```sh
+         mkdir -p .pr-ready
+         grep -qxF '.pr-ready/' .git/info/exclude 2>/dev/null || echo '.pr-ready/' >> .git/info/exclude
+         ```
+
+    b. **Write the PR draft as a JSON file**
+       - File path: `.pr-ready/<timestamp>__<branch>.json`, where `<timestamp>`
+         is `YYYYMMDD-HHMMSS` and `<branch>` is the current branch with every
+         `/` replaced by `-` (so the name is filesystem-safe).
+       - **Use the file-writing tool to create this file — do NOT `echo` or
+         heredoc the JSON through the shell.** The title and body routinely
+         contain backticks, quotes, `$`, and newlines; writing the file
+         directly avoids all shell-escaping and command-substitution hazards.
+       - Use exactly this schema (the `pr-submit` script parses it with `jq`):
+         ```json
+         {
+           "title": "<conventional-commit-style PR title>",
+           "body": "<the full PR description, exactly as it should appear>",
+           "base": "<base branch, e.g. main>",
+           "branch": "<current branch>",
+           "created_at": "<ISO 8601 timestamp>"
+         }
+         ```
+       - `body` is the complete PR description from Phase 3, preserving all
+         markdown — headings, checkboxes, and fenced code blocks included.
 
 14. **Suggest a PR title**
     - Based on the changes, suggest a conventional-commit-style PR title
+      (this is the value stored in `title` above).
     - Format: `feat: add process table with tree view` or
       `fix: correct CPU calculation`
 
 15. **Show a summary** to the user:
     - The suggested PR title
-    - Confirmation that the PR description is on the clipboard
+    - The path to the `.pr-ready/` JSON file that was written
+    - A reminder that they can run `pr-submit` from the repo to pick this
+      draft, review it, and open the PR (auto-merge, squash)
     - A summary of what was added to CHANGELOG.md (list the new entries)
     - Note any changelog entries that were already present and preserved
