@@ -6,6 +6,8 @@ description: >
   quality checks, and write the PR title and description to a local .pr-ready/ file for the pr-submit script to open the PR. Invoke when the
   user asks to "generate a PR description", "describe this PR", "write PR notes",
   "prepare a PR", "pr ready", or "prep this PR".
+metadata:
+  version: "1.0.0"
 ---
 
 # PR Ready — Description + Changelog
